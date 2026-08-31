@@ -18,5 +18,6 @@ bashio::log.info "Starting ServiceNow MCP server (streamable-http) on port ${POR
 exec uvx --prerelease allow --index-strategy unsafe-best-match --with 'mcp>=2.1.1' mcp-server-servicenow \
     --transport streamable-http \
     --port "${PORT}" \
+    --host 0.0.0.0 \
     --instance-url "${INSTANCE_URL}" \
     --auth-type "${AUTH_TYPE}"
