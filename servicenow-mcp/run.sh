@@ -14,7 +14,7 @@ export SERVICENOW_CLIENT_SECRET="$(bashio::config 'client_secret')"
 
 bashio::log.info "Starting ServiceNow MCP server (streamable-http) on port ${PORT}..."
 
-exec uvx --prerelease allow --with 'mcp>=2.1.1' mcp-server-servicenow \
+exec uvx --prerelease allow --index-strategy unsafe-best-match --with 'mcp>=2.1.1' mcp-server-servicenow \
     --transport streamable-http \
     --port "${PORT}" \
     --instance-url "${INSTANCE_URL}" \

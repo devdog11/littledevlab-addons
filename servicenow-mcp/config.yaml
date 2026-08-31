@@ -1,5 +1,5 @@
 name: ServiceNow MCP
-version: "1.0.1"
+version: "1.0.2"
 slug: servicenow_mcp
 description: >-
   Streamable-HTTP ServiceNow MCP server (mcp-server-servicenow), for
