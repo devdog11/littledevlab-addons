@@ -1,5 +1,5 @@
 name: ServiceNow MCP
-version: "1.0.2"
+version: "1.0.3"
 slug: servicenow_mcp
 description: >-
   Streamable-HTTP ServiceNow MCP server (mcp-server-servicenow), for
@@ -19,6 +19,7 @@ options:
   password: ""
   client_id: ""
   client_secret: ""
+  static_token: ""
 schema:
   instance_url: str
   auth_type: list(basic|oauth)
@@ -27,3 +28,4 @@ schema:
   password: password?
   client_id: str?
   client_secret: password?
+  static_token: password
