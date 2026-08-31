@@ -1,0 +1,29 @@
+name: ServiceNow MCP
+version: "1.0.0"
+slug: servicenow_mcp
+description: >-
+  Streamable-HTTP ServiceNow MCP server (mcp-server-servicenow), for
+  registering as a remote MCP connector once exposed via Cloudflare Tunnel.
+url: "https://github.com/devdog11/littledevlab-addons/tree/main/servicenow-mcp"
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: services
+boot: auto
+options:
+  instance_url: "https://dev322229.service-now.com"
+  auth_type: "oauth"
+  port: 8080
+  username: ""
+  password: ""
+  client_id: ""
+  client_secret: ""
+schema:
+  instance_url: str
+  auth_type: list(basic|oauth)
+  port: port
+  username: str?
+  password: password?
+  client_id: str?
+  client_secret: password?
