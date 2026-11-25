@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Fit Scorer</title>
+<style>
+:root{
+  --bg:#f5f6f8;--card:#fff;--ink:#14181f;--muted:#5d6675;--line:#dde1e7;
+  --accent:#1f6feb;--accent-ink:#fff;--good:#1a7f37;--mid:#b26b00;--bad:#c62828;
+  --chip:#eef1f5;--radius:14px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1216;--card:#181c22;--ink:#e8ebf0;--muted:#98a2b3;--line:#2a3039;
+  --accent:#4c8dff;--accent-ink:#06101f;--good:#3fb950;--mid:#e3a33a;--bad:#ff6b6b;--chip:#222831;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;padding:12px 16px calc(90px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:4px 0 12px}
+h1{font-size:20px;margin:0}
+.meta{color:var(--muted);font-size:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+label.h{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
+textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);
+  color:var(--ink);font-family:inherit;font-size:16px;line-height:1.4;padding:10px}
+textarea{min-height:180px;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.end{justify-content:flex-end}
+button{font-family:inherit;font-weight:600;font-size:15px;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);
+  padding:10px 14px;min-height:44px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);flex:1}
+button.danger{color:var(--bad)}
+button:disabled{opacity:.5}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border-radius:999px;padding:8px 14px;min-height:40px}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{flex:1;border:0;border-radius:0;background:none;color:var(--muted);min-height:56px}
+nav button[aria-current=true]{color:var(--accent)}
+.hidden{display:none!important}
+.result-head{display:flex;gap:14px;align-items:center}
+.ring{--p:0;--c:var(--accent);width:74px;height:74px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:conic-gradient(var(--c) calc(var(--p)*1%),var(--line) 0)}
+.ring span{width:58px;height:58px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-weight:700;font-size:18px}
+.verdict{font-weight:700}
+.v-strong{color:var(--good)}.v-worth{color:var(--mid)}.v-caution{color:var(--bad)}
+details{border-top:1px solid var(--line);padding:8px 0}
+details:first-of-type{margin-top:10px}
+summary{font-weight:600;cursor:pointer;min-height:32px;display:flex;align-items:center}
+ul{margin:6px 0;padding-left:20px}
+li{margin:4px 0}
+.req{border-left:4px solid var(--line);padding:4px 0 4px 10px;margin:8px 0}
+.req.strong{border-color:var(--good)}.req.moderate{border-color:var(--mid)}.req.weak{border-color:var(--bad)}
+.req b{display:block}
+.small{font-size:13px;color:var(--muted)}
+.spinner{width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;
+  animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{color:var(--bad);font-weight:600}
+.hist{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.hist:last-child{border-bottom:0}
+.hist .pct{font-weight:700;width:48px;text-align:right;flex:none}
+.hist .t{flex:1;min-width:0}
+.hist .t div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toast{position:fixed;left:50%;bottom:calc(72px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:14px;z-index:9;max-width:90vw}
+.compare{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-top:8px}
+.compare div{background:var(--chip);border-radius:10px;padding:8px;text-align:center}
+.compare b{display:block;font-size:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>Fit Scorer</h1><span class="meta" id="meta">…</span></header>
+
+  <!-- SCORE -->
+  <section id="tab-score">
+    <div class="card">
+      <label class="h" for="jd">Job description</label>
+      <textarea id="jd" placeholder="Paste the full posting here…"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="pasteBtn" type="button">Paste</button>
+        <button id="clearBtn" type="button">Clear</button>
+        <span class="small" id="jdCount"></span>
+      </div>
+    </div>
+    <div class="card">
+      <label class="h">Compare against</label>
+      <div class="chips" id="resumeChips"><span class="small">Loading resumes…</span></div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="scoreBtn" type="button">Score fit</button>
+      </div>
+    </div>
+    <div id="compare" class="card hidden"></div>
+    <div id="results"></div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="tab-history" class="hidden">
+    <div class="card" id="historyList"><span class="small">Loading…</span></div>
+    <div id="historyDetail"></div>
+  </section>
+
+  <!-- RESUMES -->
+  <section id="tab-resumes" class="hidden">
+    <div class="card">
+      <label class="h">Resumes on this HA box</label>
+      <div class="chips" id="resumeEditChips"></div>
+      <div class="row" style="margin-top:10px">
+        <button type="button" id="newResume">New</button>
+        <button type="button" id="uploadBtn">Upload .md/.txt</button>
+        <input type="file" id="upload" accept=".md,.txt,text/plain,text/markdown" multiple class="hidden">
+      </div>
+    </div>
+    <div class="card hidden" id="editor">
+      <label class="h" for="rName">Name</label>
+      <input type="text" id="rName" placeholder="e.g. SA" autocapitalize="off">
+      <label class="h" for="rText" style="margin-top:10px">Resume text</label>
+      <textarea id="rText" style="min-height:320px"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="primary" type="button" id="saveResume">Save</button>
+        <button class="danger" type="button" id="delResume">Delete</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<nav>
+  <button data-tab="score" aria-current="true">Score</button>
+  <button data-tab="history">History</button>
+  <button data-tab="resumes">Resumes</button>
+</nav>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = (p, o={}) => fetch("api/" + p, {headers:{"Content-Type":"application/json"}, ...o})
+  .then(async r => { const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error || r.status); return j; });
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("fit." + k); return v === null ? d : JSON.parse(v); }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem("fit." + k, JSON.stringify(v)); }catch{} }
+};
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(msg){ const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 2600); }
+
+let resumes = [], selected = new Set(store.get("selected", [])), editing = null;
+
+/* ---------- tabs ---------- */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+function showTab(t){
+  document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === t));
+  ["score","history","resumes"].forEach(x => $("#tab-" + x).classList.toggle("hidden", x !== t));
+  if(t === "history") loadHistory();
+  if(t === "resumes") renderEditChips();
+  store.set("tab", t); window.scrollTo(0,0);
+}
+
+/* ---------- info + resumes ---------- */
+api("info").then(i => {
+  $("#meta").textContent = `v${i.version} · ${i.model}${i.fake ? " · FAKE" : ""}`;
+  if(!i.has_key) toast("No API key set — add it in the add-on Configuration tab.");
+}).catch(()=> $("#meta").textContent = "offline?");
+
+async function loadResumes(){
+  resumes = await api("resumes");
+  const ids = resumes.map(r => r.id);
+  selected = new Set([...selected].filter(id => ids.includes(id)));
+  if(!selected.size && ids.length) selected.add(ids[0]);
+  renderChips(); renderEditChips();
+}
+function renderChips(){
+  const box = $("#resumeChips");
+  if(!resumes.length){ box.innerHTML = `<span class="small">No resumes yet. Add some in the Resumes tab.</span>`; return; }
+  const all = resumes.length > 1 ? `<button class="chip" data-all aria-pressed="${selected.size === resumes.length}">All</button>` : "";
+  box.innerHTML = all + resumes.map(r => `<button class="chip" data-id="${esc(r.id)}" aria-pressed="${selected.has(r.id)}">${esc(r.id)}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => {
+    if(b.hasAttribute("data-all")) selected = selected.size === resumes.length ? new Set([resumes[0].id]) : new Set(resumes.map(r=>r.id));
+    else { const id = b.dataset.id; selected.has(id) ? selected.delete(id) : selected.add(id); }
+    store.set("selected", [...selected]); renderChips();
+  });
+}
+
+/* ---------- JD input ---------- */
+const jd = $("#jd");
+jd.value = store.get("jd", "");
+const updCount = () => $("#jdCount").textContent = jd.value ? `${jd.value.length.toLocaleString()} chars` : "";
+jd.oninput = () => { store.set("jd", jd.value); updCount(); }; updCount();
+$("#clearBtn").onclick = () => { jd.value = ""; store.set("jd",""); updCount(); jd.focus(); };
+$("#pasteBtn").onclick = async () => {
+  try{ const t = await navigator.clipboard.readText(); if(t){ jd.value = t; store.set("jd", t); updCount(); } else toast("Clipboard is empty"); }
+  catch{ toast("Paste blocked — long-press the box and choose Paste"); jd.focus(); }
+};
+
+/* ---------- scoring ---------- */
+let pending = store.get("pending", []);   // [{id,resume_id}]
+const finished = {};
+$("#scoreBtn").onclick = async () => {
+  if(!selected.size) return toast("Pick a resume");
+  const btn = $("#scoreBtn"); btn.disabled = true;
+  try{
+    const r = await api("score", {method:"POST", body: JSON.stringify({jd: jd.value, resume_ids: [...selected]})});
+    pending = r.jobs; store.set("pending", pending);
+    for(const k in finished) delete finished[k];
+    $("#results").innerHTML = ""; renderPending(); poll();
+  }catch(e){ toast(e.message); }
+  finally{ btn.disabled = false; }
+};
+
+function renderPending(){
+  const box = $("#results");
+  for(const j of pending){
+    let el = document.getElementById("job-" + j.id);
+    if(!el){ el = document.createElement("div"); el.id = "job-" + j.id; box.appendChild(el); }
+    const rec = finished[j.id];
+    if(!rec) el.innerHTML = `<div class="card row"><div class="spinner"></div><div><b>${esc(j.resume_id)}</b><div class="small">Scoring with Claude… usually 20–60 s. Safe to lock the phone.</div></div></div>`;
+    else if(rec.status === "error") el.innerHTML = `<div class="card"><b>${esc(j.resume_id)}</b><div class="err">${esc(rec.error)}</div></div>`;
+    else el.innerHTML = resultCard(rec);
+  }
+  renderCompare();
+}
+function renderCompare(){
+  const done = pending.map(j => finished[j.id]).filter(r => r && r.status === "done");
+  const c = $("#compare");
+  if(pending.length < 2 || !done.length){ c.classList.add("hidden"); return; }
+  c.classList.remove("hidden");
+  c.innerHTML = `<label class="h">Side by side</label><div class="compare">` + pending.map(j => {
+    const r = finished[j.id]; const p = r && r.status === "done" ? r.result.overall_fit_percent + "%" : (r ? "err" : "…");
+    return `<div><b>${p}</b><span class="small">${esc(j.resume_id)}</span></div>`; }).join("") + `</div>`;
+}
+let polling = false;
+async function poll(){
+  if(polling) return; polling = true;
+  try{
+    while(pending.some(j => !finished[j.id])){
+      for(const j of pending) if(!finished[j.id]){
+        try{ const r = await api("jobs/" + j.id); if(r.status !== "running") finished[j.id] = r; }
+        catch(e){ if(String(e.message) === "404") finished[j.id] = {status:"error", error:"Job lost (add-on restarted?). Score again."}; }
+      }
+      renderPending();
+      if(pending.some(j => !finished[j.id])) await new Promise(r => setTimeout(r, 2500));
+    }
+  } finally { polling = false; }
+}
+document.addEventListener("visibilitychange", () => { if(!document.hidden && pending.length) poll(); });
+
+function vClass(v){ return v === "Strong Fit" ? "v-strong" : v === "Worth Exploring" ? "v-worth" : "v-caution"; }
+function vColor(v){ return v === "Strong Fit" ? "var(--good)" : v === "Worth Exploring" ? "var(--mid)" : "var(--bad)"; }
+function resultCard(rec){
+  const r = rec.result, when = new Date(rec.created * 1000).toLocaleString();
+  const reqs = r.requirement_scores.map(q => `<div class="req ${esc(q.score)}"><b>${esc(q.requirement)} · ${esc(q.score)}</b><span class="small">${esc(q.evidence)}</span></div>`).join("");
+  return `<div class="card">
+    <div class="result-head">
+      <div class="ring" style="--p:${r.overall_fit_percent};--c:${vColor(r.verdict)}"><span>${r.overall_fit_percent}%</span></div>
+      <div><div class="verdict ${vClass(r.verdict)}">${esc(r.verdict)}</div>
+        <div><b>${esc(rec.resume_id)}</b> vs ${esc(rec.title)}</div>
+        <div class="small">${esc(when)} · ${esc(rec.model)}</div></div>
+    </div>
+    <details open><summary>Recommendation</summary><p style="margin:4px 0">${esc(r.recommendation)}</p></details>
+    <details open><summary>Strengths (${r.strengths.length})</summary><ul>${r.strengths.map(s => `<li><b>${esc(s.requirement)}</b> — ${esc(s.evidence)}</li>`).join("") || "<li>None rated strong.</li>"}</ul></details>
+    <details open><summary>Gaps (${r.gaps.length})</summary><ul>${r.gaps.map(g => `<li>${esc(g)}</li>`).join("") || "<li>None identified.</li>"}</ul></details>
+    <details><summary>All requirements (${r.requirement_scores.length})</summary>${reqs}</details>
+    <div class="row end" style="margin-top:6px"><button type="button" onclick="copyMd('${rec.id}')">Copy markdown</button></div>
+  </div>`;
+}
+const mdCache = {};
+async function copyMd(id){
+  try{
+    const rec = mdCache[id] || (mdCache[id] = await api("history/" + id));
+    await navigator.clipboard.writeText(rec.markdown); toast("Copied");
+  }catch(e){ toast("Copy failed: " + e.message); }
+}
+
+/* ---------- history ---------- */
+async function loadHistory(){
+  const box = $("#historyList");
+  try{
+    const rows = await api("history");
+    if(!rows.length){ box.innerHTML = `<span class="small">No scores yet.</span>`; return; }
+    box.innerHTML = rows.map(h => `<div class="hist" data-id="${h.id}">
+      <div class="pct ${vClass(h.verdict)}">${h.fit}%</div>
+      <div class="t"><div><b>${esc(h.title)}</b></div><div class="small">${esc(h.resume_id)} · ${new Date(h.created*1000).toLocaleString()}</div></div></div>`).join("");
+    box.querySelectorAll(".hist").forEach(el => el.onclick = async () => {
+      const rec = await api("history/" + el.dataset.id);
+      $("#historyDetail").innerHTML = resultCard(rec) +
+        `<div class="card"><details><summary>Job description</summary><pre style="white-space:pre-wrap;font-family:inherit;font-size:14px">${esc(rec.jd)}</pre></details>
+        <div class="row" style="margin-top:8px"><button type="button" id="reuseJd">Re-use this JD</button>
+        <button type="button" class="danger" id="delHist">Delete</button></div></div>`;
+      $("#reuseJd").onclick = () => { jd.value = rec.jd; store.set("jd", rec.jd); updCount(); showTab("score"); };
+      $("#delHist").onclick = async () => { if(!confirm("Delete this result?")) return;
+        await api("history/" + rec.id, {method:"DELETE"}); $("#historyDetail").innerHTML = ""; loadHistory(); };
+      $("#historyDetail").scrollIntoView({behavior:"smooth"});
+    });
+  }catch(e){ box.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+
+/* ---------- resume editor ---------- */
+function renderEditChips(){
+  $("#resumeEditChips").innerHTML = resumes.map(r => `<button class="chip" data-id="${esc(r.id)}" aria-pressed="${editing === r.id}">${esc(r.id)}</button>`).join("")
+    || `<span class="small">None yet. Upload the .md files or tap New and paste.</span>`;
+  $("#resumeEditChips").querySelectorAll("button").forEach(b => b.onclick = () => openResume(b.dataset.id));
+}
+async function openResume(id){
+  const r = await api("resumes/" + encodeURIComponent(id));
+  editing = id; $("#rName").value = r.id; $("#rText").value = r.text;
+  $("#editor").classList.remove("hidden"); $("#delResume").classList.remove("hidden"); renderEditChips();
+}
+$("#newResume").onclick = () => { editing = null; $("#rName").value = ""; $("#rText").value = "";
+  $("#editor").classList.remove("hidden"); $("#delResume").classList.add("hidden"); renderEditChips(); $("#rName").focus(); };
+$("#saveResume").onclick = async () => {
+  const name = $("#rName").value.trim();
+  try{
+    await api("resumes/" + encodeURIComponent(name), {method:"PUT", body: JSON.stringify({text: $("#rText").value})});
+    if(editing && editing !== name) await api("resumes/" + encodeURIComponent(editing), {method:"DELETE"});
+    editing = name; toast("Saved"); await loadResumes(); $("#delResume").classList.remove("hidden");
+  }catch(e){ toast(e.message); }
+};
+$("#delResume").onclick = async () => {
+  if(!editing || !confirm(`Delete resume "${editing}"?`)) return;
+  await api("resumes/" + encodeURIComponent(editing), {method:"DELETE"});
+  editing = null; $("#editor").classList.add("hidden"); await loadResumes();
+};
+$("#uploadBtn").onclick = () => $("#upload").click();
+$("#upload").onchange = async e => {
+  let n = 0;
+  for(const f of e.target.files){
+    const name = f.name.replace(/\.(md|txt)$/i, "").replace(/[^A-Za-z0-9 _.-]/g, "_").slice(0, 80);
+    try{ await api("resumes/" + encodeURIComponent(name), {method:"PUT", body: JSON.stringify({text: await f.text()})}); n++; }
+    catch(err){ toast(`${f.name}: ${err.message}`); }
+  }
+  e.target.value = ""; toast(`Uploaded ${n}`); loadResumes();
+};
+
+/* ---------- boot ---------- */
+loadResumes().catch(e => $("#resumeChips").innerHTML = `<span class="err">${esc(e.message)}</span>`);
+if(pending.length){ renderPending(); poll(); }
+showTab(store.get("tab", "score"));
+</script>
+</body>
+</html>
