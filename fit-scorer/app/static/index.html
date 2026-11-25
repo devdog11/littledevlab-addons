@@ -161,7 +161,7 @@ function showTab(t){
 
 /* ---------- info + resumes ---------- */
 api("info").then(i => {
-  $("#meta").textContent = `v${i.version} · ${i.model}${i.fake ? " · FAKE" : ""}`;
+  $("#meta").textContent = `v${i.version} · ${i.model}${i.fake ? " · FAKE" : ""}`; $("#meta").textContent += " · key " + (i.key_hint || "?").replace(/^.*…/, "…");
   if(!i.has_key) toast("No API key set — add it in the add-on Configuration tab.");
 }).catch(()=> $("#meta").textContent = "offline?");
 

@@ -1,7 +1,9 @@
 #!/usr/bin/with-contenv bashio
 set -e
 
-export ANTHROPIC_API_KEY="$(bashio::config 'anthropic_api_key')"
+# Trim whitespace/newlines and stray quotes that sneak in when pasting on a phone.
+RAW_KEY="$(bashio::config 'anthropic_api_key')"
+export ANTHROPIC_API_KEY="$(printf '%s' "${RAW_KEY}" | tr -d '[:space:]"'"'"'')"
 export FIT_MODEL="$(bashio::config 'model')"
 export FIT_DATA_DIR=/config
 export FIT_PORT=8099
