@@ -7,16 +7,25 @@
 <title>Fit Scorer</title>
 <style>
 :root{
-  --bg:#f5f6f8;--card:#fff;--ink:#14181f;--muted:#5d6675;--line:#dde1e7;
-  --accent:#1f6feb;--accent-ink:#fff;--good:#1a7f37;--mid:#b26b00;--bad:#c62828;
-  --chip:#eef1f5;--radius:14px;
+  /* littledevlab theme (devdog11/littledevlab-claude-theme 0.5.0): drafting paper, ink, teal, logo orange */
+  --bg:#eeece4;--card:#f7f6f0;--ink:#2e3438;--muted:#5f686d;--line:#2e343840;
+  --accent:#426b78;--accent-ink:#f7f6f0;--orange:#e8742a;--good:#4e7d3a;--mid:#e8742a;--bad:#b3412f;
+  --chip:#f3f1ea;--radius:4px;--shadow:3px 3px 0 #2e343826;
+  --grid-minor:#426b7829;--grid-major:#426b784d;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root{
-  --bg:#0f1216;--card:#181c22;--ink:#e8ebf0;--muted:#98a2b3;--line:#2a3039;
-  --accent:#4c8dff;--accent-ink:#06101f;--good:#3fb950;--mid:#e3a33a;--bad:#ff6b6b;--chip:#222831;
+  /* "blueprint at night" */
+  --bg:#1f2427;--card:#252a2d;--ink:#eeece4;--muted:#a3abac;--line:#eeece433;
+  --accent:#7fa9b6;--accent-ink:#1f2427;--good:#8fbf74;--mid:#f0944f;--bad:#e07a66;--chip:#2c3235;
+  --shadow:3px 3px 0 #00000059;--grid-minor:#9fc4cf12;--grid-major:#9fc4cf24;
 }}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);
+html,body{margin:0;background-color:var(--bg);color:var(--ink);
+  background-image:
+    linear-gradient(var(--grid-major) 1px,transparent 1px),linear-gradient(90deg,var(--grid-major) 1px,transparent 1px),
+    linear-gradient(var(--grid-minor) 1px,transparent 1px),linear-gradient(90deg,var(--grid-minor) 1px,transparent 1px);
+  background-size:120px 120px,120px 120px,24px 24px,24px 24px;background-attachment:fixed;
   font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
 .wrap{max-width:760px;margin:0 auto;padding:12px 16px calc(90px + env(safe-area-inset-bottom))}
 header{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:4px 0 12px}
@@ -71,6 +80,26 @@ li{margin:4px 0}
 .compare{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-top:8px}
 .compare div{background:var(--chip);border-radius:10px;padding:8px;text-align:center}
 .compare b{display:block;font-size:20px}
+/* --- littledevlab look --- */
+h1,label.h,summary,.verdict,.compare b,.ring span,.hist .pct,nav button,button{font-family:var(--mono);letter-spacing:.3px}
+h1{letter-spacing:.5px}
+h1::before{content:"";display:inline-block;width:10px;height:10px;background:var(--orange);margin-right:8px;vertical-align:1px}
+.card{border:1px solid var(--ink);box-shadow:var(--shadow)}
+textarea,input[type=text]{border-color:var(--line);background:var(--card)}
+textarea:focus,input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px}
+button{border-color:var(--ink)}
+button.primary{box-shadow:var(--shadow)}
+button.primary:active{transform:translate(2px,2px);box-shadow:none}
+.chip{border-radius:4px}
+.chip[aria-pressed=true]{box-shadow:inset 0 -3px 0 var(--orange)}
+nav{border-top:1px solid var(--ink);background:var(--card)}
+nav button[aria-current=true]{color:var(--accent);box-shadow:inset 0 3px 0 var(--orange)}
+.ring span{border-radius:50%}
+.compare div{border:1px solid var(--line)}
+.toast{font-family:var(--mono);border-radius:4px}
+h1{white-space:nowrap}
+.meta{text-align:right;font-size:11px}
+button,textarea,input[type=text],.compare div{border-radius:4px}
 </style>
 </head>
 <body>
