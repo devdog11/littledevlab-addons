@@ -29,7 +29,7 @@ sys.path.insert(0, str(APP_DIR / "scorer"))
 from fit_scorer import MODEL  # noqa: E402
 import share  # noqa: E402
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 DATA = Path(os.environ.get("FIT_DATA_DIR", "/config"))
 RESUMES = DATA / "resumes"
 RESULTS = DATA / "results"
