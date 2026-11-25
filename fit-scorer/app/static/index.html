@@ -81,7 +81,7 @@ li{margin:4px 0}
   <section id="tab-score">
     <div class="card">
       <label class="h" for="jd">Job description</label>
-      <textarea id="jd" placeholder="Paste the full posting here…"></textarea>
+      <textarea id="jd" placeholder="Paste the full posting, or a link to it…"></textarea>
       <div class="row" style="margin-top:8px">
         <button id="pasteBtn" type="button">Paste</button>
         <button id="clearBtn" type="button">Clear</button>
@@ -280,11 +280,17 @@ async function loadHistory(){
   try{
     const rows = await api("history");
     if(!rows.length){ box.innerHTML = `<span class="small">No scores yet.</span>`; return; }
+    clearTimeout(window._histTimer);
+    if(rows.some(r => r.status === "running")) window._histTimer = setTimeout(() => { if(!$("#tab-history").classList.contains("hidden")) loadHistory(); }, 4000);
     box.innerHTML = rows.map(h => `<div class="hist" data-id="${h.id}">
-      <div class="pct ${vClass(h.verdict)}">${h.fit}%</div>
+      <div class="pct ${vClass(h.verdict)}">${h.status === "running" ? '<div class="spinner" style="margin-left:auto"></div>' : h.status === "error" ? '<span class="err">err</span>' : h.fit + "%"}</div>
       <div class="t"><div><b>${esc(h.title)}</b></div><div class="small">${esc(h.resume_id)} · ${new Date(h.created*1000).toLocaleString()}</div></div></div>`).join("");
     box.querySelectorAll(".hist").forEach(el => el.onclick = async () => {
       const rec = await api("history/" + el.dataset.id);
+      if(rec.status !== "done"){
+        $("#historyDetail").innerHTML = `<div class="card"><b>${esc(rec.resume_id)}</b> vs ${esc(rec.title)}<div class="${rec.status === "error" ? "err" : "small"}">${esc(rec.error || "Still scoring… pull back to History in a bit.")}</div></div>`;
+        return;
+      }
       $("#historyDetail").innerHTML = resultCard(rec) +
         `<div class="card"><details><summary>Job description</summary><pre style="white-space:pre-wrap;font-family:inherit;font-size:14px">${esc(rec.jd)}</pre></details>
         <div class="row" style="margin-top:8px"><button type="button" id="reuseJd">Re-use this JD</button>
