@@ -1,5 +1,5 @@
 name: Fit Scorer
-version: "1.0.1"
+version: "1.1.0"
 slug: fit_scorer
 description: >-
   Paste a job description from your phone and score it against your canned
@@ -11,6 +11,8 @@ arch:
 init: false
 startup: application
 boot: auto
+stdin: true
+homeassistant_api: true
 ingress: true
 ingress_port: 8099
 panel_icon: mdi:briefcase-search
@@ -20,6 +22,10 @@ map:
 options:
   anthropic_api_key: ""
   model: ""
+  notify_service: ""
+  share_resumes: "all"
 schema:
   anthropic_api_key: password
   model: str?
+  notify_service: str?
+  share_resumes: str?

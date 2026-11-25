@@ -14,6 +14,7 @@ the HA host), never in the image:
 import json
 import os
 import re
+import socket
 import sys
 import threading
 import time
@@ -26,8 +27,9 @@ APP_DIR = Path(__file__).parent
 sys.path.insert(0, str(APP_DIR / "scorer"))
 
 from fit_scorer import MODEL  # noqa: E402
+import share  # noqa: E402
 
-VERSION = "1.0.1"
+VERSION = "1.1.0"
 DATA = Path(os.environ.get("FIT_DATA_DIR", "/config"))
 RESUMES = DATA / "resumes"
 RESULTS = DATA / "results"
@@ -35,6 +37,11 @@ STATIC = APP_DIR / "static"
 PORT = int(os.environ.get("FIT_PORT", "8099"))
 SCORE_MODEL = os.environ.get("FIT_MODEL", "").strip() or MODEL
 FAKE = os.environ.get("FIT_FAKE") == "1"  # local UI testing without an API key
+NOTIFY_SERVICE = os.environ.get("FIT_NOTIFY", "").strip()
+SHARE_RESUMES = os.environ.get("FIT_SHARE_RESUMES", "").strip() or "all"
+# Sidebar panel path for this add-on (Supervisor hostname is <repo>-fit-scorer).
+PANEL_URL = "/" + socket.gethostname().replace("-", "_")
+BATCHES: dict[str, list[str]] = {}
 
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,79}$")
 JOBS: dict[str, dict] = {}
@@ -138,6 +145,84 @@ def run_job(job_id: str):
         traceback.print_exc()
         with JOBS_LOCK:
             job.update(status="error", error=f"{name}: {msg}", finished=int(time.time()))
+    finally:
+        batch_check(job.get("batch"))
+
+
+def batch_check(batch_id):
+    """When every job in a Share Sheet batch is finished, send one HA notification."""
+    if not batch_id:
+        return
+    with JOBS_LOCK:
+        ids = BATCHES.get(batch_id)
+        if not ids or any(JOBS[i]["status"] == "running" for i in ids):
+            return
+        BATCHES.pop(batch_id, None)
+        recs = [JOBS[i] for i in ids]
+    parts = []
+    for r in sorted(recs, key=lambda r: -(r.get("result") or {}).get("overall_fit_percent", -1)):
+        if r["status"] == "done":
+            parts.append(f"{r['resume_id']} {r['result']['overall_fit_percent']}% {r['result']['verdict']}")
+        else:
+            parts.append(f"{r['resume_id']} failed: {r.get('error', '')[:120]}")
+    share.notify(NOTIFY_SERVICE, f"Fit: {recs[0]['title'][:60]}", " · ".join(parts), PANEL_URL)
+
+
+def resolve_resume_ids(spec) -> list[str]:
+    if isinstance(spec, str):
+        spec = [] if spec.strip().lower() in ("", "all") else [x for x in spec.split(",") if x.strip()]
+    ids = [safe_id(x) for x in (spec or [])]
+    return ids or [r["id"] for r in list_resumes()]
+
+
+def prepare_jd(jd: str, title: str = "") -> tuple[str, str]:
+    """If the 'JD' is really just a link, fetch the posting text."""
+    jd = (jd or "").strip()
+    url = share.find_url(jd)
+    if url and len(jd) < 400:
+        fetched_title, jd = share.fetch_posting(url)
+        title = title or fetched_title
+    if len(jd) < 40:
+        raise ValueError("Paste the full job description (at least a few lines) or a link to it.")
+    return jd, (title.strip()[:90] or jd_title(jd))
+
+
+def start_batch(jd: str, resume_ids: list[str], title: str, notify: bool = False) -> list[dict]:
+    if not resume_ids:
+        raise ValueError("Pick at least one resume.")
+    jobs, batch_id = [], (uuid.uuid4().hex[:8] if notify else None)
+    for rid in resume_ids[:6]:
+        if not resume_path(rid).exists():
+            raise ValueError(f"Resume '{rid}' not found.")
+    with JOBS_LOCK:
+        for rid in resume_ids[:6]:
+            job_id = uuid.uuid4().hex[:12]
+            JOBS[job_id] = {"id": job_id, "status": "running", "resume_id": safe_id(rid), "batch": batch_id,
+                            "title": title, "jd": jd, "created": int(time.time())}
+            jobs.append({"id": job_id, "resume_id": safe_id(rid)})
+        if batch_id:
+            BATCHES[batch_id] = [j["id"] for j in jobs]
+    for j in jobs:
+        threading.Thread(target=run_job, args=(j["id"],), daemon=True).start()
+    return jobs
+
+
+def handle_share(payload):
+    """One hassio.addon_stdin payload: a string (JD text or URL) or {"jd": ..., "resumes": ..., "title": ...}."""
+    if isinstance(payload, str):
+        payload = {"jd": payload}
+    if not isinstance(payload, dict):
+        raise ValueError(f"Unsupported stdin payload: {type(payload).__name__}")
+    print(f"[fit-scorer] share received ({len(str(payload.get('jd', '')))} chars)", flush=True)
+    try:
+        jd, title = prepare_jd(str(payload.get("jd", "")), str(payload.get("title", "")))
+        ids = resolve_resume_ids(payload.get("resumes", SHARE_RESUMES))
+        start_batch(jd, ids, title, notify=True)
+    except Exception as exc:
+        msg = f"Couldn't fetch that link ({exc}). Select the description text and share that instead." \
+            if isinstance(exc, OSError) else str(exc)
+        share.notify(NOTIFY_SERVICE, "Fit Scorer: couldn't score", msg[:300], PANEL_URL)
+        raise
 
 
 def load_record(job_id: str):
@@ -152,6 +237,11 @@ def load_record(job_id: str):
 
 def history(limit=40):
     rows = []
+    with JOBS_LOCK:
+        live = [dict(j) for j in JOBS.values() if j["status"] in ("running", "error")]
+    for j in sorted(live, key=lambda j: -j["created"]):
+        rows.append({"id": j["id"], "title": j["title"], "resume_id": j["resume_id"], "created": j["created"],
+                     "status": j["status"], "fit": None, "verdict": j["status"]})
     for p in sorted(RESULTS.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)[:limit]:
         try:
             r = json.loads(p.read_text(encoding="utf-8"))
@@ -207,7 +297,8 @@ class Handler(BaseHTTPRequestHandler):
                 key = os.environ.get("ANTHROPIC_API_KEY", "")
                 hint = f"{key[:10]}…{key[-4:]} ({len(key)} chars)" if len(key) > 16 else ("set" if key else "none")
                 self.send_json({"version": VERSION, "model": SCORE_MODEL, "fake": FAKE,
-                                "has_key": bool(key) or FAKE, "key_hint": hint})
+                                "has_key": bool(key) or FAKE, "key_hint": hint,
+                                "notify": NOTIFY_SERVICE, "share_resumes": SHARE_RESUMES})
             elif parts == ["api", "resumes"]:
                 self.send_json(list_resumes())
             elif len(parts) == 3 and parts[:2] == ["api", "resumes"]:
@@ -261,33 +352,26 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if parts == ["api", "score"]:
                 data = self.body_json()
-                jd = (data.get("jd") or "").strip()
                 ids = data.get("resume_ids") or []
-                if len(jd) < 40:
-                    raise ValueError("Paste the full job description (at least a few lines).")
                 if not ids:
                     raise ValueError("Pick at least one resume.")
-                title = (data.get("title") or "").strip()[:90] or jd_title(jd)
-                jobs = []
-                for rid in ids[:6]:
-                    if not resume_path(rid).exists():
-                        raise ValueError(f"Resume '{rid}' not found.")
-                    job_id = uuid.uuid4().hex[:12]
-                    with JOBS_LOCK:
-                        JOBS[job_id] = {"id": job_id, "status": "running", "resume_id": safe_id(rid),
-                                        "title": title, "jd": jd, "created": int(time.time())}
-                    threading.Thread(target=run_job, args=(job_id,), daemon=True).start()
-                    jobs.append({"id": job_id, "resume_id": safe_id(rid)})
+                jd, title = prepare_jd(data.get("jd") or "", data.get("title") or "")
+                jobs = start_batch(jd, [safe_id(i) for i in ids], title)
                 return self.send_json({"jobs": jobs, "title": title})
             self.send_json({"error": "Not found"}, 404)
         except (ValueError, json.JSONDecodeError) as exc:
             self.send_json({"error": str(exc)}, 400)
+        except OSError as exc:  # URL fetch failures
+            self.send_json({"error": f"Couldn't fetch that link: {exc}"}, 502)
 
 
 def main():
     RESUMES.mkdir(parents=True, exist_ok=True)
     RESULTS.mkdir(parents=True, exist_ok=True)
-    print(f"[fit-scorer] v{VERSION} on :{PORT} model={SCORE_MODEL} data={DATA} fake={FAKE}", flush=True)
+    print(f"[fit-scorer] v{VERSION} on :{PORT} model={SCORE_MODEL} data={DATA} fake={FAKE} "
+          f"notify={NOTIFY_SERVICE or '-'} share_resumes={SHARE_RESUMES} panel={PANEL_URL}", flush=True)
+    if os.environ.get("FIT_STDIN", "1") == "1":
+        threading.Thread(target=share.stdin_loop, args=(handle_share,), daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 
 

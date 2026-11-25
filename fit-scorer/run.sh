@@ -5,6 +5,8 @@ set -e
 RAW_KEY="$(bashio::config 'anthropic_api_key')"
 export ANTHROPIC_API_KEY="$(printf '%s' "${RAW_KEY}" | tr -d '[:space:]"'"'"'')"
 export FIT_MODEL="$(bashio::config 'model')"
+export FIT_NOTIFY="$(bashio::config 'notify_service')"
+export FIT_SHARE_RESUMES="$(bashio::config 'share_resumes')"
 export FIT_DATA_DIR=/config
 export FIT_PORT=8099
 

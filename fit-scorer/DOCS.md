@@ -27,6 +27,24 @@ Edit them with the Samba or File editor add-on, or from the page itself.
   picks the result back up when you return.
 - **History**: every result, with the JD, **Re-use this JD** and **Copy markdown**.
 
+## iOS Share Sheet (1.1.0+)
+
+Share a posting (link or selected text) from Safari/LinkedIn → **Fit Score** shortcut →
+HA push notification with every resume's score. Tap it to open the page.
+
+Configuration:
+
+- `notify_service`: your phone's notify service without `notify.`, e.g.
+  `mobile_app_tysons_iphone` (Developer tools → Actions → search "notify.mobile_app").
+- `share_resumes`: `all`, or a comma list like `AI,SA`. Each resume is one API call.
+
+The shortcut calls `hassio.addon_stdin` with `{"addon": "<slug>", "input": "<text or URL>"}`.
+`input` can also be `{"jd": "...", "resumes": "AI,SA", "title": "..."}`.
+
+Links: works for most ATS pages (Greenhouse, Lever, Ashby, LinkedIn public job pages,
+anything with schema.org JobPosting). Login-walled or JavaScript-only pages fail;
+select the description text and share that instead. You'll get a push saying so.
+
 ## Verdict bands
 
 80–100 Strong Fit · 30–79 Worth Exploring · 0–29 Explore with Caution
