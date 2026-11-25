@@ -27,7 +27,7 @@ sys.path.insert(0, str(APP_DIR / "scorer"))
 
 from fit_scorer import MODEL  # noqa: E402
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 DATA = Path(os.environ.get("FIT_DATA_DIR", "/config"))
 RESUMES = DATA / "resumes"
 RESULTS = DATA / "results"
@@ -48,6 +48,11 @@ def get_client():
         from config import build_client
         _client = build_client()
     return _client
+
+
+def key_hint() -> str:
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    return f"{key[:10]}…{key[-4:]} ({len(key)} chars)" if len(key) > 16 else ("set" if key else "none")
 
 
 def safe_id(raw: str) -> str:
@@ -125,6 +130,9 @@ def run_job(job_id: str):
     except Exception as exc:  # surface everything to the phone
         name = type(exc).__name__
         msg = str(exc)
+        if name == "AuthenticationError":
+            msg = ("Anthropic rejected the API key (401). Re-paste it in the add-on Configuration tab, "
+                   "Save, then Restart. Key in use: " + key_hint())
         if name == "MissingCredentialError":
             msg = "No Anthropic API key. Add it in the add-on's Configuration tab, then restart the add-on."
         traceback.print_exc()
@@ -196,8 +204,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
             elif parts == ["api", "info"]:
+                key = os.environ.get("ANTHROPIC_API_KEY", "")
+                hint = f"{key[:10]}…{key[-4:]} ({len(key)} chars)" if len(key) > 16 else ("set" if key else "none")
                 self.send_json({"version": VERSION, "model": SCORE_MODEL, "fake": FAKE,
-                                "has_key": bool(os.environ.get("ANTHROPIC_API_KEY")) or FAKE})
+                                "has_key": bool(key) or FAKE, "key_hint": hint})
             elif parts == ["api", "resumes"]:
                 self.send_json(list_resumes())
             elif len(parts) == 3 and parts[:2] == ["api", "resumes"]:
